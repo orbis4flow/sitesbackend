@@ -1,5 +1,5 @@
 -- ============================================================================
--- Buy / Sell (rise / fall) on VeraBinary
+-- Buy / Sell (rise / fall) on ZenyTrade
 -- Run after 001-021. Idempotent, safe to re-run.
 --
 -- The bars site trades whether the price ends higher (rise, shown as Buy) or
