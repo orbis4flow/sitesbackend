@@ -2,13 +2,13 @@
 -- A second site on the same API
 -- Run after 019.
 --
--- lyrabinary.com is a second front end on this backend. Accounts and
+-- zenytrade.com is a second front end on this backend. Accounts and
 -- money are shared; what the console needs is to tell the two sites
 -- apart. Each deposit now records the site it was made through, and
 -- the Domains figures count a deposit against that site.
 --
 -- Rows from before this (and every account that never recorded a site)
--- belong to korabinary.com, which was the only site there was.
+-- belong to kivobinary.com, which was the only site there was.
 -- ============================================================
 
 alter table public.payments
@@ -18,19 +18,19 @@ create index if not exists payments_domain_idx
   on public.payments(domain_host) where domain_host is not null;
 
 insert into public.domains (host, label, status)
-values ('lyrabinary.com', 'LyraBinary', 'live')
+values ('zenytrade.com', 'ZenyTrade', 'live')
 on conflict (host) do nothing;
 
 -- nexas.trade was the primary in the first version of 004, before the
--- product moved to korabinary.com. It was never a site anyone used, and
+-- product moved to kivobinary.com. It was never a site anyone used, and
 -- a database that ran the old seed still lists it.
 delete from public.domains where host = 'nexas.trade';
 
--- Those databases never got korabinary.com either, since the old seed
+-- Those databases never got kivobinary.com either, since the old seed
 -- listed nexas.trade in its place. Make sure the primary is there, dated
 -- first so the console lists it at the top.
 insert into public.domains (host, label, status, created_at)
-values ('korabinary.com', 'Primary', 'live', now() - interval '1 year')
+values ('kivobinary.com', 'Primary', 'live', now() - interval '1 year')
 on conflict (host) do update set label = 'Primary', status = 'live';
 
 -- ---------- money per domain ----------
@@ -50,14 +50,14 @@ as $$
   select
     d.host, d.label, d.status,
     coalesce((select count(*) from public.profiles p
-               where coalesce(p.domain_host, 'korabinary.com') = d.host), 0)::integer,
+               where coalesce(p.domain_host, 'kivobinary.com') = d.host), 0)::integer,
     coalesce((select sum(pay.amount_minor) from public.payments pay
                join public.profiles p on p.id = pay.user_id
-              where coalesce(pay.domain_host, p.domain_host, 'korabinary.com') = d.host
+              where coalesce(pay.domain_host, p.domain_host, 'kivobinary.com') = d.host
                 and pay.direction = 'deposit' and pay.status = 'success'), 0)::bigint,
     coalesce((select sum(w.amount_minor) from public.withdrawal_requests w
                join public.profiles p on p.id = w.user_id
-              where coalesce(p.domain_host, 'korabinary.com') = d.host
+              where coalesce(p.domain_host, 'kivobinary.com') = d.host
                 and w.status = 'paid'), 0)::bigint
   from public.domains d
   order by d.created_at;

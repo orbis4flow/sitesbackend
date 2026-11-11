@@ -1,6 +1,6 @@
-# Kora API
+# Kivo API
 
-The backend for KoraBinary, LyraBinary and VexaBinary, and the Kora admin
+The backend for KivoBinary, ZenyTrade and VeraBinary, and the Kivo admin
 console. A copy of the Novi API with its own Supabase project and its own
 Render service: nothing here touches Novi.
 
@@ -16,8 +16,8 @@ Render service: nothing here touches Novi.
    CORS_ORIGINS = the three sites + the admin host.
 3. Put the Render URL and the Supabase URL + publishable key into
    `assets/js/config.js` on each site and in the admin.
-4. The M-Pesa clone app has a `kora` rail for this backend
-   (`services/rails/kora.ts`); set its baseUrl to the Render URL.
+4. The M-Pesa clone app has a `kivo` rail for this backend
+   (`services/rails/kivo.ts`); set its baseUrl to the Render URL.
 
 
 Express service in front of Supabase, with PayHero (M-Pesa) and USDT. No card payments on this stack.

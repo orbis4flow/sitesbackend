@@ -3,7 +3,7 @@
 # .env.example as the checklist.
 services:
   - type: web
-    name: kora-api
+    name: kivo-api
     runtime: node
     plan: starter          # free instances sleep, and a sleeping service
                            # misses payment webhooks. Do not use free here.
@@ -21,11 +21,11 @@ services:
       - key: SUPABASE_SERVICE_ROLE_KEY
         sync: false
       - key: BRAND_NAME
-        value: Kora
+        value: Kivo
       - key: BRAND_DOMAIN
-        value: korabinary.com
+        value: kivobinary.com
       - key: PRIMARY_HOST
-        value: korabinary.com
+        value: kivobinary.com
       - key: PAYHERO_API_USERNAME
         sync: false
       - key: PAYHERO_API_PASSWORD

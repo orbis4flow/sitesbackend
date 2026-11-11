@@ -1,6 +1,6 @@
 /* Which of our sites a request came from.
 
-   One API serves more than one front end (Kora, Lyra and Vexa),
+   One API serves more than one front end (Kivo, Zeny and Vera),
    and the console needs to say which site an account
    was opened on and which site a deposit was made through. The browser
    sends the page's origin with every cross-site call, so that is what is
@@ -10,7 +10,7 @@ import { originKnown } from './origins.js';
 
 /* The site everything belonged to before a second one existed. A row
    with no host recorded is read as this one. */
-export const PRIMARY_HOST = process.env.PRIMARY_HOST || 'korabinary.com';
+export const PRIMARY_HOST = process.env.PRIMARY_HOST || 'kivobinary.com';
 
 export function siteHost(req) {
   const raw = req.get('origin') || req.get('referer') || '';

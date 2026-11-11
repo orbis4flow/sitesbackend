@@ -139,6 +139,6 @@ grant execute on function public.domain_figures()      to service_role;
 -- a list of domains that omits one of them is a list you cannot trust.
 insert into public.domains (host, label, status)
 values
-  ('korabinary.com',           'Primary',  'live'),
-  ('admin.korabinary.com', 'Console',  'live')
+  ('kivobinary.com',           'Primary',  'live'),
+  ('admin.kivobinary.com', 'Console',  'live')
 on conflict (host) do nothing;

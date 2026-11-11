@@ -35,8 +35,8 @@ const RULES = {
   /* The name on the wallet texts, the M-Pesa statement lines and the
      stand-in email domain. One backend serves several sites, so this is
      the group name rather than any one site. */
-  BRAND_NAME: process.env.BRAND_NAME || 'Kora',
-  BRAND_DOMAIN: process.env.BRAND_DOMAIN || 'korabinary.com',
+  BRAND_NAME: process.env.BRAND_NAME || 'Kivo',
+  BRAND_DOMAIN: process.env.BRAND_DOMAIN || 'kivobinary.com',
 
   /* The rails collect shillings, so this is shillings: USD 5 at the rate
      below. The customer types dollars and never sees this figure except

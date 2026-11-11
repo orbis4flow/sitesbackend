@@ -128,7 +128,7 @@ function overdraftLine(usedMinor) {
  *
  * U7A31F8C92D Confirmed. You have received Ksh4,000.00
  * from Julius Lokorono 071****582 on 25/9/26 at 5:15 AM.
- * ${BRAND} Wallet balance is Ksh4,000.00. Trade smart with Kora.
+ * ${BRAND} Wallet balance is Ksh4,000.00. Trade smart with Kivo.
  *
  * @param {object} tx
  * @param {object} wallet

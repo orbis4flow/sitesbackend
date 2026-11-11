@@ -1,5 +1,5 @@
 /* ============================================================
-   Kora API (Kora, Lyra and Vexa share it)
+   Kivo API (Kivo, Zeny and Vera share it)
    Express in front of Supabase, with PayHero (M-Pesa) and USDT for money.
 
    Mounting order matters in one place: the Paystack webhook needs the
@@ -99,7 +99,7 @@ const startedAt = Date.now();
 app.get('/health', (_req, res) => {
   res.json({
     ok: true,
-    service: 'kora-api',
+    service: 'kivo-api',
     env: env.NODE_ENV,
     uptimeSeconds: Math.round(process.uptime()),
     startedAt: new Date(startedAt).toISOString(),
@@ -146,7 +146,7 @@ app.use(notFoundHandler);
 app.use(errorHandler);
 
 const server = app.listen(env.PORT, () => {
-  logger.info(`kora-api listening on ${env.PORT} (${env.NODE_ENV})`);
+  logger.info(`kivo-api listening on ${env.PORT} (${env.NODE_ENV})`);
   /* The PayHero callback is derived rather than configured, so the only
      way to know it is to be told. Printed once, into the server log. */
   logger.info(`payhero callback   ${payheroCallbackUrl()}`);
