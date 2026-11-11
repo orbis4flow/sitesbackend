@@ -1,0 +1,61 @@
+# Render blueprint. Point Render at this repo and it picks this up.
+# Secrets are NOT here — set them in Render → Environment, using
+# .env.example as the checklist.
+services:
+  - type: web
+    name: kora-api
+    runtime: node
+    plan: starter          # free instances sleep, and a sleeping service
+                           # misses payment webhooks. Do not use free here.
+        buildCommand: npm ci
+    startCommand: npm start
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_ANON_KEY
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: BRAND_NAME
+        value: Kora
+      - key: BRAND_DOMAIN
+        value: korabinary.com
+      - key: PRIMARY_HOST
+        value: korabinary.com
+      - key: PAYSTACK_SECRET_KEY
+        sync: false
+      - key: PAYHERO_API_USERNAME
+        sync: false
+      - key: PAYHERO_API_PASSWORD
+        sync: false
+      - key: PAYHERO_CHANNEL_ID
+        sync: false
+      # API_URL is not listed: it defaults to RENDER_EXTERNAL_URL, which
+      # Render sets itself, so the payment callbacks always point at this
+      # instance. Set it only if the API sits behind a custom domain.
+      # The demo rail's M-Pesa confirmation texts. All optional: with none
+      # of them set the rail moves money without texting anybody. Celcom
+      # is used when both providers are configured.
+      - key: CELCOM_API_KEY
+        sync: false
+      - key: CELCOM_PARTNER_ID
+        sync: false
+      - key: CELCOM_SHORTCODE
+        sync: false
+      - key: AFRICASTALKING_USERNAME
+        sync: false
+      - key: AFRICASTALKING_API_KEY
+        sync: false
+      - key: AFRICASTALKING_SENDER_ID
+        sync: false
+      # auto (Celcom first), africastalking, or celcom
+      - key: SMS_PROVIDER
+        sync: false
+      - key: CORS_ORIGINS      # your front end origins, comma separated
+        sync: false
+      - key: APP_URL           # defaults to the first CORS origin
+        sync: false
