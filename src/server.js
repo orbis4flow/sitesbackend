@@ -1,6 +1,6 @@
 /* ============================================================
    Kora API (Kora, Lyra and Vexa share it)
-   Express in front of Supabase, with Paystack and PayHero for money.
+   Express in front of Supabase, with PayHero (M-Pesa) and USDT for money.
 
    Mounting order matters in one place: the Paystack webhook needs the
    raw request body to check its signature, so it is registered before
@@ -82,7 +82,6 @@ app.use(cors({
 /* ---- webhooks come first: raw body, no rate limit ----
    Rate limiting a provider's retries would turn a transient blip into
    lost settlements. */
-app.use('/webhooks/paystack', express.raw({ type: '*/*', limit: '1mb' }));
 app.use('/webhooks', express.json({ limit: '1mb' }), webhookRoutes);
 
 /* ---- everything else ---- */
@@ -150,7 +149,6 @@ const server = app.listen(env.PORT, () => {
   logger.info(`kora-api listening on ${env.PORT} (${env.NODE_ENV})`);
   /* The PayHero callback is derived rather than configured, so the only
      way to know it is to be told. Printed once, into the server log. */
-  logger.info(`paystack webhook   ${env.API_URL}/webhooks/paystack`);
   logger.info(`payhero callback   ${payheroCallbackUrl()}`);
   /* An empty allow-list is not an error — webhooks and health checks carry
      no Origin — but every browser call will be refused, which looks like

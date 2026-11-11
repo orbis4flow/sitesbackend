@@ -20,7 +20,7 @@ Render service: nothing here touches Novi.
    (`services/rails/kora.ts`); set its baseUrl to the Render URL.
 
 
-Express service in front of Supabase, with Paystack (cards) and PayHero (M-Pesa).
+Express service in front of Supabase, with PayHero (M-Pesa) and USDT. No card payments on this stack.
 
 ## Getting it running
 
@@ -54,17 +54,8 @@ Then in Supabase → SQL editor, run `sql/001_schema.sql` and `sql/002_policies.
 | Method | Path | Notes |
 |---|---|---|
 | POST | `/deposits/mpesa` | `{ amountMinor, phone }` → STK push |
-| POST | `/deposits/card` | `{ amountMinor }` → Paystack checkout URL |
-| POST | `/deposits/mpesa/:reference/resend` | the prompt never arrived: a new one through Paystack, same amount and phone |
+| POST | `/deposits/mpesa/:reference/resend` | the prompt never arrived: a new PayHero prompt, same amount and phone |
 
-**M-Pesa fallback.** If PayHero refuses the prompt, cannot be reached, or
-takes longer than `PAYHERO_PUSH_TIMEOUT_MS` (15s) to accept it,
-`POST /deposits/mpesa` sends it through Paystack's M-Pesa charge instead and
-answers with `rail: "paystack"`. A PayHero push that only timed out is left
-pending, since the prompt may still arrive. Set `MPESA_FALLBACK=off` to turn
-it off. `MPESA_PRIMARY=paystack` skips PayHero entirely and sends every
-M-Pesa prompt through Paystack. Needs a Paystack account for a Kenyan
-business, charging in KES.
 | GET  | `/deposits/:reference` | poll while the waiting screen is up |
 | GET  | `/deposits` | recent deposits |
 
@@ -108,7 +99,6 @@ whether to place the next one.
 ### Webhooks
 | Method | Path | Notes |
 |---|---|---|
-| POST | `/webhooks/paystack` | HMAC SHA-512 over the raw body |
 | POST | `/webhooks/payhero/:secret` | secret in the path; PayHero does not sign |
 
 ### Manual credits (console)
@@ -128,7 +118,7 @@ click is refused rather than paid twice.
 Nothing in a route handler changes a balance. A deposit goes:
 
 1. `POST /deposits/*` writes a **pending** payment row with our own reference, **then** calls the provider. That order is deliberate: if the provider succeeds but our response is lost, the callback still finds a row to settle.
-2. The provider calls a webhook. The signature (Paystack) or path secret (PayHero) is checked.
+2. The provider calls a webhook. The path secret (PayHero) is checked.
 3. We ask the provider's API what actually happened rather than believing the payload.
 4. `settle_deposit()` credits the balance and writes a ledger entry **in one transaction**, and returns early if the payment is already settled — so a replayed webhook is a no-op.
 
@@ -146,9 +136,8 @@ Two things follow from this that are worth not undoing later:
 After the first deploy:
 
 1. Nothing to do for `API_URL` — it defaults to Render's own `RENDER_EXTERNAL_URL`, so callbacks point at the live service from the first boot. Set it explicitly only behind a custom domain. `APP_URL` defaults to the first `CORS_ORIGINS` entry.
-2. Paystack dashboard → Settings → Webhooks → `https://<service>.onrender.com/webhooks/paystack`.
-3. PayHero callback → the URL printed in the boot log as `payhero callback`. It is derived from the service-role key rather than configured, so it is stable across restarts and instances — but rotating that key changes it, and the dashboard has to be updated at the same time.
-4. Supabase, Authentication, URL Configuration:
+2. PayHero callback → the URL printed in the boot log as `payhero callback`. It is derived from the service-role key rather than configured, so it is stable across restarts and instances — but rotating that key changes it, and the dashboard has to be updated at the same time.
+3. Supabase, Authentication, URL Configuration:
 
    **Site URL** `https://novibinary.com`
 
@@ -171,7 +160,7 @@ After the first deploy:
 ## When something is not working
 
 The console's **Logs** page is the first place to look. It shows, at the
-top, whether this service can currently reach Supabase, Paystack and
+top, whether this service can currently reach Supabase and
 PayHero — each probe is an authenticated call, so a green light means the
 credentials work, not merely that the hostname resolves. A dependency can
 report `key` rather than `down`, which is the difference between "they
@@ -276,7 +265,7 @@ The half of M-Pesa an audience actually recognises is the message that
 arrives a second after the PIN, so the rail sends one. Every movement —
 a deposit onto the trading balance, a payout back, an agent withdrawal, a
 reversal — is followed by a Safaricom-shaped SMS to the number on the
-wallet, through **Celcom Africa**:
+wallet, through **Africa's Talking**:
 
 ```
 TDK7X2M4P1 Confirmed. Ksh5,000.00 paid to NOVI MARKETS. on 20/9/26 at
@@ -285,12 +274,11 @@ TDK7X2M4P1 Confirmed. Ksh5,000.00 paid to NOVI MARKETS. on 20/9/26 at
 
 #### Which gateway
 
-Two are supported, and **Celcom is used when both are configured**:
+Africa's Talking is the only gateway on this stack:
 
 | Provider | Settings, all required together | What it is for |
 | --- | --- | --- |
-| Celcom Africa | `CELCOM_API_KEY`, `CELCOM_PARTNER_ID`, `CELCOM_SHORTCODE` | The registered sender a real demo should go out under |
-| Africa's Talking | `AFRICASTALKING_USERNAME`, `AFRICASTALKING_API_KEY`, and optionally `AFRICASTALKING_SENDER_ID` | An account you can have in a minute, for wiring the rail up before the other credentials exist |
+| Africa's Talking | `AFRICASTALKING_USERNAME`, `AFRICASTALKING_API_KEY`, and optionally `AFRICASTALKING_SENDER_ID` | A sandbox username tests against their simulator; a live one sends for real |
 
 With none of it set the rail runs exactly as it did before, silently. The
 boot log prints which gateway will be used, or why none is — half-set
@@ -334,7 +322,7 @@ Sending is fire-and-forget and never blocks a movement: the money has
 already moved by the time the gateway is called, and a refused or slow
 message is written to the event log (`source: sms`, with the provider on
 the row) rather than failing a deposit that settled. Wording lives in
-`services/mpesaSms.js`, the gateways in `services/celcom.js` and
+`services/mpesaSms.js`, the gateway in
 `services/africastalking.js` behind `services/sms.js`, and the single call
 site is `move()` in `services/mpesaDemo.js` — so nothing can move on this
 rail without a text following it.
@@ -350,8 +338,7 @@ is refused outright.
 
 ### The line this must not cross
 
-The wallet is a presentation prop. It touches no PayHero credential and no
-Paystack key, it is reachable only for accounts an admin has marked VIP, and
+The wallet is a presentation prop. It touches no PayHero credential, it is reachable only for accounts an admin has marked VIP, and
 Standard accounts remain the only path real money takes. The PIN is stored in
 plain text **deliberately**: it is assigned by an admin, never chosen by a
 customer, so it cannot be anyone's real M-Pesa PIN, and the console has to read
@@ -383,4 +370,3 @@ the server decided, and only the insert policy changes.
 - [ ] Replace the fixed `USD_RATE_KES` with a rates feed; a stale rate leaks value in one direction.
 - [ ] An operator surface for approving payouts (`release_withdrawal` is written and ready).
 - [ ] Move contracts and the price feed server-side. While the browser decides trade outcomes, anyone can edit their own balance in devtools — everything above only secures the *money in and out*.
-- [ ] Paystack Transfers for automated payouts, once your account is approved for them.

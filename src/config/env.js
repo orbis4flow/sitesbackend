@@ -104,12 +104,6 @@ const schema = z.object({
   /* Bypasses row level security. Server only, always. */
   SUPABASE_SERVICE_ROLE_KEY: secret().pipe(z.string().min(20)),
 
-  /* Paystack: the secret key is all that is needed. Transactions are
-     created through the API with the amount, so there is no hosted
-     payment page to configure, and nothing Paystack-shaped runs in the
-     browser, so there is no public key to publish. */
-  PAYSTACK_SECRET_KEY: secret().pipe(z.string().min(10)),
-
   /* PayHero: HTTP Basic. Either paste a ready-made token or give the
      username and password and let the server build it. */
   PAYHERO_API_USERNAME: secret().optional().default(''),
@@ -117,14 +111,6 @@ const schema = z.object({
   PAYHERO_BASIC_TOKEN: secret().optional().default(''),
   PAYHERO_CHANNEL_ID: secret().optional().default(''),
 
-  /* When PayHero cannot send the M-Pesa prompt (refuses, is down, or is
-     too slow to answer), send it through Paystack instead. 'off' turns
-     the fallback off and a PayHero failure is reported as before. */
-  MPESA_FALLBACK: z.enum(['paystack', 'off']).default('paystack'),
-  /* Which rail sends the M-Pesa prompt first. 'paystack' skips PayHero
-     altogether: for testing the fallback, or for running without PayHero
-     while it is down. */
-  MPESA_PRIMARY: z.enum(['payhero', 'paystack']).default('payhero'),
   /* How long to wait for PayHero to accept the prompt before falling
      back. Its answer normally takes a second or two. */
   PAYHERO_PUSH_TIMEOUT_MS: z.coerce.number().int().min(3000).max(60000).default(15000),
@@ -138,13 +124,6 @@ const schema = z.object({
      Celcom is preferred when both are configured; see services/sms.js,
      which holds that order in one place. */
 
-  /* Celcom Africa. The shortcode is the sender ID they have registered
-     for this account: whatever was approved (NOVI, NOVIMARKETS). It can
-     never be MPESA, which belongs to Safaricom. */
-  CELCOM_API_KEY: secret().optional().default(''),
-  CELCOM_PARTNER_ID: secret().optional().default(''),
-  CELCOM_SHORTCODE: secret().optional().default(''),
-
   /* Africa's Talking. The username decides which of their two worlds the
      key belongs to: "sandbox" is their test app, and a message sent
      through it reaches their simulator and never a handset. The sender
@@ -154,10 +133,6 @@ const schema = z.object({
   AFRICASTALKING_API_KEY: secret().optional().default(''),
   AFRICASTALKING_SENDER_ID: secret().optional().default(''),
 
-  /* Which SMS gateway to use when both are configured. auto prefers
-     Celcom; africastalking or celcom forces that one (if it is set up),
-     so one can be switched off without deleting its credentials. */
-  SMS_PROVIDER: z.enum(['auto', 'celcom', 'africastalking']).default('auto')
 });
 
 /* ---------- URL fallbacks ----------
@@ -191,8 +166,7 @@ export const env = {
   ...RULES,
   SUPABASE_URL,
   SUPABASE_ANON_KEY,
-  PAYHERO_BASE_URL: 'https://backend.payhero.co.ke/api/v2',
-  CELCOM_BASE_URL: 'https://isms.celcomafrica.com/api/services'
+  PAYHERO_BASE_URL: 'https://backend.payhero.co.ke/api/v2'
 };
 
 /* Which gateway the demo rail will text through, and why none when
@@ -203,34 +177,17 @@ export const env = {
    The order here has to match the list in services/sms.js. It is two
    providers and one line, so it is repeated rather than imported: this
    file is read before anything else is loaded. */
-const celcomSet = !!(env.CELCOM_API_KEY && env.CELCOM_PARTNER_ID && env.CELCOM_SHORTCODE);
-const celcomPart = !!(env.CELCOM_API_KEY || env.CELCOM_PARTNER_ID || env.CELCOM_SHORTCODE);
 const atSet = !!(env.AFRICASTALKING_USERNAME && env.AFRICASTALKING_API_KEY);
 const atPart = !!(env.AFRICASTALKING_USERNAME || env.AFRICASTALKING_API_KEY);
 
-const atLine = () => (env.AFRICASTALKING_USERNAME === 'sandbox'
-  ? "Africa's Talking (sandbox — messages reach their simulator, not a handset), sender AFRICASTKNG"
-  : `Africa's Talking, sender ${env.AFRICASTALKING_SENDER_ID || 'AFRICASTKNG'}`);
-
-export const smsSource = (env.SMS_PROVIDER === 'africastalking' && atSet)
-  ? atLine() + ' (chosen by SMS_PROVIDER' + (celcomSet ? '; Celcom is set and unused' : '') + ')'
-  : (env.SMS_PROVIDER === 'celcom' && celcomSet)
-  ? `Celcom, sender ${env.CELCOM_SHORTCODE} (chosen by SMS_PROVIDER)`
-  : celcomSet
-  ? `Celcom, sender ${env.CELCOM_SHORTCODE}` +
-    (atSet ? " (Africa's Talking is also set and is the standby)" : '')
-  : atSet
-    ? (env.AFRICASTALKING_USERNAME === 'sandbox'
-        ? "Africa's Talking (sandbox — messages reach their simulator, not a handset), sender AFRICASTKNG" +
-          (env.AFRICASTALKING_SENDER_ID
-            ? ` (sandbox refuses a registered sender ID, so ${env.AFRICASTALKING_SENDER_ID} is not being sent)` : '')
-        : `Africa's Talking, sender ${env.AFRICASTALKING_SENDER_ID || 'AFRICASTKNG'}`) +
-      (celcomPart ? ' — Celcom is half-set and is being ignored' : '')
-    : celcomPart
-      ? 'nothing — CELCOM_API_KEY, CELCOM_PARTNER_ID and CELCOM_SHORTCODE are all required together'
-      : atPart
-        ? 'nothing — AFRICASTALKING_USERNAME and AFRICASTALKING_API_KEY are required together'
-        : 'nothing — the demo rail will move money silently';
+/* Africa's Talking is the only gateway on this stack. */
+export const smsSource = atSet
+  ? (env.AFRICASTALKING_USERNAME === 'sandbox'
+      ? "Africa's Talking (sandbox — messages reach their simulator, not a handset), sender AFRICASTKNG"
+      : `Africa's Talking, sender ${env.AFRICASTALKING_SENDER_ID || 'AFRICASTKNG'}`)
+  : atPart
+    ? 'nothing — AFRICASTALKING_USERNAME and AFRICASTALKING_API_KEY are required together'
+    : 'nothing — the demo rail will move money silently';
 
 export const isProd = env.NODE_ENV === 'production';
 

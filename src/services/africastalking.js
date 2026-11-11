@@ -1,7 +1,7 @@
 /* ============================================================
    Africa's Talking — the other SMS gateway
 
-   Same four questions as celcom.js, so sms.js can hold the two in a list
+   The four questions sms.js asks of a gateway, so it can hold it in a list
    and take whichever is configured. This one is second in that list: it
    is here because a sandbox account can be had in a minute and a
    registered Celcom sender ID cannot, which makes it the one to test a

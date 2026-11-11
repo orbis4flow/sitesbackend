@@ -25,7 +25,6 @@ import { newReference } from '../lib/reference.js';
 import { events } from '../lib/events.js';
 import * as demo from '../services/mpesaDemo.js';
 import { normalisePhone } from '../lib/phone.js';
-import * as paystack from '../services/paystack.js';
 import * as payhero from '../services/payhero.js';
 import { siteHost } from '../lib/site.js';
 
@@ -114,151 +113,75 @@ router.post('/mpesa',
         return depositFromHandset(req, res, { phone, profile });
       }
 
-      /* PayHero switched off: straight to Paystack. */
-      if (env.MPESA_PRIMARY === 'paystack') {
-        return await promptViaPaystack(req, res, {
-          phone,
-          amountMinor: req.body.amountMinor,
-          currency: req.body.currency,
-          because: 'primary',
-          replaces: null
-        });
-      }
-
-      try {
-        payment = await createPending({
-          site: siteHost(req),
-          userId: req.user.id,
-          provider: 'payhero',
-          amount_minor: req.body.amountMinor,
-          currency: req.body.currency,
-          phone
-        });
-
-        const result = await payhero.stkPush({
-          phone,
-          amountMinor: payment.amount_minor,
-          reference: payment.reference,
-          name: profile?.display_name
-        });
-
-        await admin.from('payments')
-          .update({
-            provider_ref: result?.reference || result?.CheckoutRequestID || null,
-            raw: result
-          })
-          .eq('id', payment.id);
-
-        /* Recorded on the way out, not only when it breaks. "The push was
-           accepted and here is exactly what they said" is the line that
-           settles an argument about whether a prompt was ever sent. */
-        events.info('payhero', 'STK push accepted for ' + phone.slice(0, 6) + '***', {
-          userId: req.user.id,
-          reference: payment.reference,
-          context: { amountMinor: payment.amount_minor, response: result }
-        });
-
-        return res.status(202).json({
-          ok: true,
-          status: 'pending',
-          rail: 'payhero',
-          reference: payment.reference,
-          message: 'Check your phone for the M-Pesa prompt and enter your PIN.'
-        });
-      } catch (err) {
-        /* A refusal means the push never left, so the row is closed. A
-           timeout is different: the prompt may still arrive and be paid,
-           so that row stays open and settles like any other if it is. */
-        if (payment && !err.timedOut) {
-          await quietly(admin.rpc('fail_payment', {
-            p_payment_id: payment.id,
-            p_reason: err.message?.slice(0, 300) || 'stk push failed',
-            p_raw: null
-          }));
-        }
-        events.error('payhero', 'STK push failed: ' + (err.message || 'unknown') +
-          (env.MPESA_FALLBACK === 'paystack' ? ', trying Paystack' : ''), {
-          userId: req.user.id,
-          reference: payment?.reference,
-          context: { amountMinor: req.body.amountMinor, timedOut: !!err.timedOut }
-        });
-
-        if (env.MPESA_FALLBACK !== 'paystack') throw err;
-        return await promptViaPaystack(req, res, {
-          phone,
-          amountMinor: req.body.amountMinor,
-          currency: req.body.currency,
-          because: err.timedOut ? 'payhero_timeout' : 'payhero_failed',
-          replaces: payment?.reference || null
-        });
-      }
+      return await pushViaPayhero(req, res, {
+        phone,
+        amountMinor: req.body.amountMinor,
+        currency: req.body.currency,
+        name: profile?.display_name,
+        replaces: null
+      });
     } catch (err) {
       next(err);
     }
   });
 
-/* ---------------- M-Pesa, via Paystack ----------------
-   The fallback. Used when PayHero cannot send the prompt, and when the
-   customer says the prompt never arrived. A payment row of its own, so
-   the two attempts never share a reference, and it settles through the
-   Paystack webhook and verify call exactly as a card payment does. */
-async function promptViaPaystack(req, res, { phone, amountMinor, currency, because, replaces }) {
+/* ---------------- M-Pesa, via PayHero ----------------
+   The STK push. Card payments and the Paystack fallback are not part of
+   this stack: every M-Pesa prompt goes through PayHero. */
+async function pushViaPayhero(req, res, { phone, amountMinor, currency, name, replaces }) {
   let payment;
   try {
     payment = await createPending({
       site: siteHost(req),
       userId: req.user.id,
-      provider: 'paystack',
+      provider: 'payhero',
       amount_minor: amountMinor,
       currency: currency || 'KES',
-      phone,
-      prefix: 'MP'
+      phone
     });
 
-    const result = await paystack.chargeMpesa({
-      /* Paystack will not charge without an email. An account signed up
-         by phone may not have one, so it gets a stand-in on our domain. */
-      email: req.user.email || `${req.user.id}@customers.${env.BRAND_DOMAIN}`,
-      amountMinor: payment.amount_minor,
-      currency: payment.currency,
+    const result = await payhero.stkPush({
       phone,
+      amountMinor: payment.amount_minor,
       reference: payment.reference,
-      metadata: { user_id: req.user.id, payment_id: payment.id, rail: 'mpesa', because, replaces }
+      name
     });
 
     await admin.from('payments')
       .update({
-        provider_ref: result?.reference || null,
-        raw: { rail: 'mpesa', because, replaces, response: result }
+        provider_ref: result?.reference || result?.CheckoutRequestID || null,
+        raw: replaces ? { replaces, response: result } : result
       })
       .eq('id', payment.id);
 
-    events.info('paystack', 'M-Pesa prompt sent through Paystack for ' + phone.slice(0, 6) + '***', {
+    events.info('payhero', 'STK push accepted for ' + phone.slice(0, 6) + '***', {
       userId: req.user.id,
       reference: payment.reference,
-      context: { amountMinor, because, replaces, status: result?.status }
+      context: { amountMinor: payment.amount_minor, replaces, response: result }
     });
 
     return res.status(202).json({
       ok: true,
       status: 'pending',
-      rail: 'paystack',
+      rail: 'payhero',
       reference: payment.reference,
-      message: result?.display_text ||
-        'Check your phone for the M-Pesa prompt and enter your PIN.'
+      message: 'Check your phone for the M-Pesa prompt and enter your PIN.'
     });
   } catch (err) {
-    if (payment) {
+    /* A refusal means the push never left, so the row is closed. A
+       timeout is different: the prompt may still arrive and be paid,
+       so that row stays open and settles like any other if it is. */
+    if (payment && !err.timedOut) {
       await quietly(admin.rpc('fail_payment', {
         p_payment_id: payment.id,
-        p_reason: err.message?.slice(0, 300) || 'paystack m-pesa failed',
+        p_reason: err.message?.slice(0, 300) || 'stk push failed',
         p_raw: null
       }));
     }
-    events.error('paystack', 'M-Pesa through Paystack failed: ' + (err.message || 'unknown'), {
+    events.error('payhero', 'STK push failed: ' + (err.message || 'unknown'), {
       userId: req.user.id,
       reference: payment?.reference,
-      context: { amountMinor, because, replaces }
+      context: { amountMinor, replaces, timedOut: !!err.timedOut }
     });
     throw err;
   }
@@ -267,7 +190,7 @@ async function promptViaPaystack(req, res, { phone, amountMinor, currency, becau
 /* ---------------- "the prompt never came" ----------------
    The waiting screen offers this after a while. The first attempt is
    left open, since a late prompt can still be paid, and a new prompt goes
-   out through Paystack for the same amount to the same phone. */
+   out through PayHero for the same amount to the same phone. */
 router.post('/mpesa/:reference/resend',
   requireAuth,
   paymentLimiter,
@@ -283,15 +206,11 @@ router.post('/mpesa/:reference/resend',
       if (first.status === 'success') {
         throw badRequest('That payment has already gone through.');
       }
-      if (env.MPESA_FALLBACK !== 'paystack') {
-        throw badRequest('Resending is not available right now. Try again in a moment.');
-      }
-
-      return await promptViaPaystack(req, res, {
+      return await pushViaPayhero(req, res, {
         phone: first.phone,
         amountMinor: Number(first.amount_minor),
         currency: first.currency,
-        because: 'no_prompt',
+        name: null,
         replaces: first.reference
       });
     } catch (err) { next(err); }
@@ -471,61 +390,6 @@ async function depositFromHandset(req, res, { phone, profile }) {
   });
 }
 
-/* ---------------- Card, via Paystack ---------------- */
-router.post('/card',
-  requireAuth,
-  paymentLimiter,
-  validate(z.object({
-    amountMinor,
-    currency: z.string().length(3).default('KES')
-  })),
-  async (req, res, next) => {
-    let payment;
-    try {
-      payment = await createPending({
-        site: siteHost(req),
-        userId: req.user.id,
-        provider: 'paystack',
-        amount_minor: req.body.amountMinor,
-        currency: req.body.currency
-      });
-
-      const result = await paystack.initializeTransaction({
-        email: req.user.email,
-        amountMinor: payment.amount_minor,
-        currency: payment.currency,
-        reference: payment.reference,
-        metadata: { user_id: req.user.id, payment_id: payment.id }
-      });
-
-      await admin.from('payments')
-        .update({ provider_ref: result.reference || null, raw: result })
-        .eq('id', payment.id);
-
-      res.status(201).json({
-        ok: true,
-        status: 'pending',
-        reference: payment.reference,
-        checkoutUrl: result.authorization_url,
-        accessCode: result.access_code
-      });
-    } catch (err) {
-      if (payment) {
-        await quietly(admin.rpc('fail_payment', {
-          p_payment_id: payment.id,
-          p_reason: err.message?.slice(0, 300) || 'initialize failed',
-          p_raw: null
-        }));
-      }
-      events.error('paystack', 'Could not open a checkout: ' + (err.message || 'unknown'), {
-        userId: req.user.id,
-        reference: payment?.reference,
-        context: { amountMinor: req.body.amountMinor }
-      });
-      next(err);
-    }
-  });
-
 /* ---------------- polling ----------------
    The browser sits on the waiting screen and polls this. If a callback
    was lost, asking the provider directly here is what rescues the
@@ -578,28 +442,6 @@ router.get('/', requireAuth, async (req, res, next) => {
    Exported so a scheduled job can sweep stale pendings too. */
 export async function reconcile(payment) {
   const { localToUsdMinor } = await import('../lib/money.js');
-
-  if (payment.provider === 'paystack') {
-    const tx = await paystack.verifyTransaction(payment.reference);
-    if (tx.status === 'success') {
-      /* Trust the provider's amount, not ours: it is what was actually
-         collected. */
-      const credited = localToUsdMinor(tx.amount, tx.currency || payment.currency);
-      await admin.rpc('settle_deposit', {
-        p_payment_id: payment.id,
-        p_provider_ref: String(tx.id || tx.reference),
-        p_credited_minor: credited,
-        p_raw: tx
-      });
-    } else if (['failed', 'abandoned', 'reversed'].includes(tx.status)) {
-      await admin.rpc('fail_payment', {
-        p_payment_id: payment.id,
-        p_reason: tx.gateway_response || tx.status,
-        p_raw: tx
-      });
-    }
-    return;
-  }
 
   if (payment.provider === 'payhero') {
     const found = await payhero.findTransaction(payment);

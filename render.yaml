@@ -26,8 +26,6 @@ services:
         value: korabinary.com
       - key: PRIMARY_HOST
         value: korabinary.com
-      - key: PAYSTACK_SECRET_KEY
-        sync: false
       - key: PAYHERO_API_USERNAME
         sync: false
       - key: PAYHERO_API_PASSWORD
@@ -38,22 +36,13 @@ services:
       # Render sets itself, so the payment callbacks always point at this
       # instance. Set it only if the API sits behind a custom domain.
       # The demo rail's M-Pesa confirmation texts. All optional: with none
-      # of them set the rail moves money without texting anybody. Celcom
-      # is used when both providers are configured.
-      - key: CELCOM_API_KEY
-        sync: false
-      - key: CELCOM_PARTNER_ID
-        sync: false
-      - key: CELCOM_SHORTCODE
-        sync: false
+      # of them set the rail moves money without texting anybody.
+      # Africa's Talking only on this stack.
       - key: AFRICASTALKING_USERNAME
         sync: false
       - key: AFRICASTALKING_API_KEY
         sync: false
       - key: AFRICASTALKING_SENDER_ID
-        sync: false
-      # auto (Celcom first), africastalking, or celcom
-      - key: SMS_PROVIDER
         sync: false
       - key: CORS_ORIGINS      # your front end origins, comma separated
         sync: false

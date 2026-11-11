@@ -61,34 +61,6 @@ export function checkSupabase() {
   });
 }
 
-/* Paystack: /balance is authenticated, cheap, and returns something an
-   operator actually wants to see. A wrong key gives 401, which is a
-   different problem from Paystack being down. */
-export function checkPaystack() {
-  return timed(async () => {
-    if (!env.PAYSTACK_SECRET_KEY) return { status: 'off', detail: 'No secret key set' };
-    const t = withTimeout(TIMEOUT_MS);
-    try {
-      const res = await fetch('https://api.paystack.co/balance', {
-        headers: { Authorization: `Bearer ${env.PAYSTACK_SECRET_KEY}` },
-        signal: t.signal
-      });
-      const body = await res.json().catch(() => ({}));
-      if (res.status === 401) return { status: 'auth', detail: 'Secret key rejected' };
-      if (!res.ok) return { status: 'down', detail: body.message || `HTTP ${res.status}` };
-
-      const first = Array.isArray(body.data) ? body.data[0] : null;
-      return {
-        status: 'live',
-        detail: first
-          ? `${first.currency} ${(Number(first.balance || 0) / 100).toLocaleString()}`
-          : 'Authenticated',
-        mode: env.PAYSTACK_SECRET_KEY.startsWith('sk_live') ? 'live' : 'test'
-      };
-    } finally { t.done(); }
-  });
-}
-
 /* PayHero: no status endpoint, so ask about a reference that cannot
    exist. Credentials being accepted is the signal — whether the lookup
    finds anything is beside the point. 401/403 means the Basic token is
@@ -138,8 +110,8 @@ export function checkPayments() {
 }
 
 export async function checkAll() {
-  const [supabase, paystack, payhero, sms, payments] = await Promise.all([
-    checkSupabase(), checkPaystack(), checkPayhero(), checkSms(), checkPayments()
+  const [supabase, payhero, sms, payments] = await Promise.all([
+    checkSupabase(), checkPayhero(), checkSms(), checkPayments()
   ]);
-  return { supabase, paystack, payhero, sms, payments };
+  return { supabase, payhero, sms, payments };
 }

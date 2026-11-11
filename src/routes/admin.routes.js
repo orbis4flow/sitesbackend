@@ -1084,7 +1084,7 @@ router.post('/users/:id/wallet/test-sms',
     try {
       if (!smsConfigured()) {
         throw badRequest('No SMS gateway is configured. Set either the three ' +
-          'CELCOM_ settings or AFRICASTALKING_USERNAME and ' +
+          'AFRICASTALKING_USERNAME and ' +
           'AFRICASTALKING_API_KEY on the API.');
       }
 
@@ -1252,7 +1252,6 @@ router.get('/health', async (req, res, next) => {
         smsProvider: smsProvider(),
         smsSender: smsSender(),
         webhooks: {
-          paystack: `${env.API_URL}/webhooks/paystack`,
           payhero: payheroCallbackUrl()
         }
       },
@@ -1286,7 +1285,7 @@ router.post('/system/test-sms',
     try {
       if (!smsConfigured()) {
         throw badRequest('No SMS gateway is configured. Set either the three ' +
-          'CELCOM_ settings or AFRICASTALKING_USERNAME and ' +
+          'AFRICASTALKING_USERNAME and ' +
           'AFRICASTALKING_API_KEY on the API.');
       }
 

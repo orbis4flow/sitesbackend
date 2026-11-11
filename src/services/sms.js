@@ -29,19 +29,16 @@
        reports 'off' and the demo runs in silence, which is what a laptop
        with no .env should do.
    ============================================================ */
-import * as celcom from './celcom.js';
 import * as africastalking from './africastalking.js';
 import { events } from '../lib/events.js';
 import { normalisePhone } from '../lib/phone.js';
 import { env } from '../config/env.js';
 
-const GATEWAYS = [celcom, africastalking];
+/* Africa's Talking is the only gateway on this stack. */
+const GATEWAYS = [africastalking];
 
 /** Whichever is configured, in order of preference. null when none is. */
 export function gateway() {
-  /* SMS_PROVIDER picks one outright, when that one is set up. */
-  const forced = { celcom, africastalking }[env.SMS_PROVIDER];
-  if (forced && forced.configured()) return forced;
   return GATEWAYS.find(g => g.configured()) || null;
 }
 
@@ -55,7 +52,7 @@ export function smsSender() {
   return g ? g.sender() : null;
 }
 
-/** 'Celcom' | "Africa's Talking" | null — for the console and the logs. */
+/** "Africa's Talking" | null — for the console and the logs. */
 export function smsProvider() {
   const g = gateway();
   return g ? g.label : null;
