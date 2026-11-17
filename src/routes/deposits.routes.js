@@ -238,8 +238,10 @@ router.post('/usdt',
     /* A Tron hash is 64 hex characters. Checked because a customer who
        pastes the wrong thing waits for a credit that will never come,
        and the person reviewing it has nothing to look up. */
-    txHash: z.string().trim().regex(/^[A-Fa-f0-9]{64}$/,
-      'That does not look like a TRC-20 transaction hash')
+    /* Or a Binance Pay order ID (digits) when paid to the Binance ID. */
+    txHash: z.string().trim().refine(
+      v => /^[A-Fa-f0-9]{64}$/.test(v) || /^[0-9]{6,32}$/.test(v),
+      'That does not look like a TRC-20 hash or a Binance order ID')
   })),
   async (req, res, next) => {
     try {
