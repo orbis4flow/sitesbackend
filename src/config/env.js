@@ -111,6 +111,10 @@ const schema = z.object({
   PAYHERO_BASIC_TOKEN: secret().optional().default(''),
   PAYHERO_CHANNEL_ID: secret().optional().default(''),
 
+  /* Paystack, for card deposits through Paystack Inline. Optional: with
+     no key the card option is simply not offered. sk_test_ or sk_live_. */
+  PAYSTACK_SECRET_KEY: secret().optional().default(''),
+
   /* How long to wait for PayHero to accept the prompt before falling
      back. Its answer normally takes a second or two. */
   PAYHERO_PUSH_TIMEOUT_MS: z.coerce.number().int().min(3000).max(60000).default(15000),

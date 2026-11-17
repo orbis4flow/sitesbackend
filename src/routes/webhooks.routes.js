@@ -17,9 +17,54 @@ import { admin } from '../lib/supabase.js';
 import { payheroCallbackSecret } from '../config/env.js';
 import { events } from '../lib/events.js';
 import * as payhero from '../services/payhero.js';
+import * as paystack from '../services/paystack.js';
 import { reconcile } from './deposits.routes.js';
 
 const router = Router();
+
+/* ---------------- Paystack ----------------
+   The signature proves the message is Paystack's; reconcile() then asks
+   Paystack's API before anything is credited. */
+router.post('/paystack', async (req, res) => {
+  const signature = req.get('x-paystack-signature');
+  const raw = req.body;                       // Buffer, see server.js
+
+  if (!Buffer.isBuffer(raw) || !paystack.verifySignature(raw, signature)) {
+    events.error('paystack', 'Webhook rejected: signature did not verify', {
+      context: { hadSignature: !!signature }
+    });
+    return res.status(401).json({ ok: false });
+  }
+
+  res.status(200).json({ ok: true });         // acknowledge, then work
+
+  try {
+    const event = JSON.parse(raw.toString('utf8'));
+    const reference = event?.data?.reference;
+    if (!reference) return;
+
+    const { data: payment } = await admin
+      .from('payments').select('*').eq('reference', reference).maybeSingle();
+    if (!payment) {
+      events.error('paystack', 'Webhook for a reference we have no record of', {
+        reference, context: { event: event.event }
+      });
+      return;
+    }
+
+    if (event.event === 'charge.success') {
+      await reconcile(payment);
+    } else if (['charge.failed', 'transaction.failed'].includes(event.event)) {
+      await admin.rpc('fail_payment', {
+        p_payment_id: payment.id,
+        p_reason: event?.data?.gateway_response || event.event,
+        p_raw: event
+      });
+    }
+  } catch (err) {
+    events.error('paystack', 'Webhook processing failed: ' + err.message);
+  }
+});
 
 /* ---------------- PayHero ----------------
    Authenticated by a secret in the path, because PayHero does not sign

@@ -26,6 +26,7 @@ import { events } from '../lib/events.js';
 import * as demo from '../services/mpesaDemo.js';
 import { normalisePhone } from '../lib/phone.js';
 import * as payhero from '../services/payhero.js';
+import * as paystack from '../services/paystack.js';
 import { siteHost } from '../lib/site.js';
 
 const router = Router();
@@ -390,6 +391,75 @@ async function depositFromHandset(req, res, { phone, profile }) {
   });
 }
 
+/* ---------------- Card, via Paystack Inline ----------------
+   Opens the transaction and returns its access code. The browser resumes
+   it in Paystack's popup, where the card details are typed into
+   Paystack's own frame. The balance moves only when the webhook or the
+   polling route below has verified the charge with Paystack. */
+router.post('/card',
+  requireAuth,
+  paymentLimiter,
+  validate(z.object({
+    amountMinor,
+    currency: z.string().length(3).default('KES')
+  })),
+  async (req, res, next) => {
+    if (!paystack.configured()) {
+      return next(badRequest('Card deposits are not available just now. Use M-Pesa or USDT.'));
+    }
+    let payment;
+    try {
+      payment = await createPending({
+        site: siteHost(req),
+        userId: req.user.id,
+        provider: 'paystack',
+        amount_minor: req.body.amountMinor,
+        currency: req.body.currency,
+        prefix: 'CD'
+      });
+
+      const result = await paystack.initializeTransaction({
+        email: req.user.email,
+        amountMinor: payment.amount_minor,
+        currency: payment.currency,
+        reference: payment.reference,
+        metadata: { user_id: req.user.id, payment_id: payment.id }
+      });
+
+      await admin.from('payments')
+        .update({ provider_ref: result.reference || null, raw: result })
+        .eq('id', payment.id);
+
+      events.info('paystack', 'Card checkout opened', {
+        userId: req.user.id,
+        reference: payment.reference,
+        context: { amountMinor: payment.amount_minor, currency: payment.currency }
+      });
+
+      res.status(201).json({
+        ok: true,
+        status: 'pending',
+        rail: 'paystack',
+        reference: payment.reference,
+        accessCode: result.access_code
+      });
+    } catch (err) {
+      if (payment) {
+        await quietly(admin.rpc('fail_payment', {
+          p_payment_id: payment.id,
+          p_reason: err.message?.slice(0, 300) || 'initialize failed',
+          p_raw: null
+        }));
+      }
+      events.error('paystack', 'Could not open a card checkout: ' + (err.message || 'unknown'), {
+        userId: req.user.id,
+        reference: payment?.reference,
+        context: { amountMinor: req.body.amountMinor }
+      });
+      next(err);
+    }
+  });
+
 /* ---------------- polling ----------------
    The browser sits on the waiting screen and polls this. If a callback
    was lost, asking the provider directly here is what rescues the
@@ -442,6 +512,27 @@ router.get('/', requireAuth, async (req, res, next) => {
    Exported so a scheduled job can sweep stale pendings too. */
 export async function reconcile(payment) {
   const { localToUsdMinor } = await import('../lib/money.js');
+
+  if (payment.provider === 'paystack') {
+    if (!paystack.configured()) return;
+    const tx = await paystack.verifyTransaction(payment.reference);
+    if (tx.status === 'success') {
+      /* What Paystack actually collected, not what was asked for. */
+      await admin.rpc('settle_deposit', {
+        p_payment_id: payment.id,
+        p_provider_ref: String(tx.id || tx.reference),
+        p_credited_minor: localToUsdMinor(tx.amount, tx.currency || payment.currency),
+        p_raw: tx
+      });
+    } else if (['failed', 'reversed'].includes(tx.status)) {
+      await admin.rpc('fail_payment', {
+        p_payment_id: payment.id,
+        p_reason: tx.gateway_response || tx.status,
+        p_raw: tx
+      });
+    }
+    return;
+  }
 
   if (payment.provider === 'payhero') {
     const found = await payhero.findTransaction(payment);

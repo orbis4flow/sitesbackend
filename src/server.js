@@ -82,6 +82,8 @@ app.use(cors({
 /* ---- webhooks come first: raw body, no rate limit ----
    Rate limiting a provider's retries would turn a transient blip into
    lost settlements. */
+/* Paystack signs the exact bytes it sent, so its body stays raw. */
+app.use('/webhooks/paystack', express.raw({ type: '*/*', limit: '1mb' }));
 app.use('/webhooks', express.json({ limit: '1mb' }), webhookRoutes);
 
 /* ---- everything else ---- */
@@ -117,6 +119,8 @@ app.get('/config', (_req, res) => {
     maxDepositMinor: env.MAX_DEPOSIT_MINOR,
     minWithdrawalMinor: env.MIN_WITHDRAWAL_MINOR,
     usdRateKes: env.USD_RATE_KES,
+    /* Whether card deposits (Paystack Inline) are switched on. */
+    card: !!env.PAYSTACK_SECRET_KEY,
     /* The deposit address is public by nature: it is what people send
        money to. Served from here rather than hardcoded in the site so
        changing wallets is one environment variable, not a deploy of

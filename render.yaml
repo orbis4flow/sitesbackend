@@ -32,6 +32,9 @@ services:
         sync: false
       - key: PAYHERO_CHANNEL_ID
         sync: false
+      # Card deposits (Paystack Inline). Leave unset to keep cards off.
+      - key: PAYSTACK_SECRET_KEY
+        sync: false
       # API_URL is not listed: it defaults to RENDER_EXTERNAL_URL, which
       # Render sets itself, so the payment callbacks always point at this
       # instance. Set it only if the API sits behind a custom domain.
