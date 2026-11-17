@@ -38,10 +38,10 @@ const RULES = {
   BRAND_NAME: process.env.BRAND_NAME || 'Kivo',
   BRAND_DOMAIN: process.env.BRAND_DOMAIN || 'kivobinary.com',
 
-  /* The rails collect shillings, so this is shillings: USD 5 at the rate
+  /* The rails collect shillings, so this is shillings: USD 10 at the rate
      below. The customer types dollars and never sees this figure except
      on the line that says what the phone will actually be debited. */
-  MIN_DEPOSIT_MINOR: 64500,        /* KES 645, i.e. USD 5 */
+  MIN_DEPOSIT_MINOR: 129000,       /* KES 1,290, i.e. USD 10 */
   MAX_DEPOSIT_MINOR: 15000000,     /* KES 150,000 */
   /* Withdrawals are requested in USD cents, which is what the balance is
      held in and, now, what the whole product is quoted in. */
