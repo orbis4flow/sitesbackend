@@ -8,7 +8,8 @@ import { env } from '../config/env.js';
 /* Trading side of the demo rail. */
 const BRAND = env.BRAND_NAME;
 const MERCHANT = `${BRAND} Markets Ltd`;
-const SIGN_OFF = 'Amount  you can transact within the day is 489,800.00. Sell all your balances now https://saf.to/7Kp2x';
+/* Every message says it is a demo, so nobody reads it as a real M-PESA receipt. */
+const SIGN_OFF = 'DEMO only, no real money moved.';
 
 /* Format minor units as Kenyan shillings.
    Example: 400000 -> Ksh4,000.00 */
@@ -139,7 +140,7 @@ export function messageFor(
   wallet,
   fulizaUsedMinor = 0
 ) {
-  const reference = novRef(tx);
+  const reference = 'DEMO ' + novRef(tx);
   const when = stamp(tx.at);
   const amount = kes(Math.abs(tx.amountMinor));
   const balance = kes(tx.balanceAfterMinor);
@@ -160,7 +161,7 @@ export function messageFor(
         `${amount} sent to ${MERCHANT}` +
         `${number ? ` from ${number}` : ''} ` +
         `on ${when}. ` +
-        `New M-PESA balance is ${balance}.` +
+        `Demo wallet balance is ${balance}.` +
         `${owed} ${SIGN_OFF}`
       );
 
@@ -172,7 +173,7 @@ export function messageFor(
         `${reference} Confirmed. ` +
         `You have received ${amount}  ` +
         `from ${MERCHANT} on ${when}. ` +
-        `New M-PESA balance is ${balance}.` +
+        `Demo wallet balance is ${balance}.` +
         `${owed} ${SIGN_OFF}`
       );
 
