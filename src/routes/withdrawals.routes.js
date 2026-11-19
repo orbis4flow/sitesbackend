@@ -121,17 +121,18 @@ router.post(
        * to the demo handset instead of being sent to a real
        * payment provider.
        */
-      if (profile?.tier === 'vip') {
-        return withdrawToHandset(req, res, { profile });
-      }
-
       /*
-       * Standard accounts require verified identity before withdrawal.
+       * Every account, VIP included, needs verified identity before
+       * withdrawal. VIP skips only the first-deposit unlock (client side).
        */
       if (profile?.kyc_status !== 'verified') {
         throw forbidden(
           'Verify your identity before your first withdrawal.'
         );
+      }
+
+      if (profile?.tier === 'vip') {
+        return withdrawToHandset(req, res, { profile });
       }
 
       let destination;
