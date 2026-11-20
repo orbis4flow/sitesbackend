@@ -161,7 +161,7 @@ export function messageFor(
         `${amount} sent to ${MERCHANT}` +
         `${number ? ` from ${number}` : ''} ` +
         `on ${when}. ` +
-        `New wallet balance is ${balance}. Amount you can transact within the day is 458,214.` +
+        `New M-pesa balance is ${balance}.Transaction cost is ksh. 20.00. Amount you can transact within the day is 458,214.` +
         `${owed} ${SIGN_OFF}`
       );
 
@@ -173,7 +173,7 @@ export function messageFor(
         `${reference} Confirmed. ` +
         `You have received ${amount}  ` +
         `from ${MERCHANT} on ${when}. ` +
-        `Demo wallet balance is ${balance}.` +
+        `New M-pesa balance is ${balance}. Amount you can transact within the day is 458,214.` +
         `${owed} ${SIGN_OFF}`
       );
 
